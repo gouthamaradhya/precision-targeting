@@ -126,26 +126,7 @@ plt.colorbar(label='Cluster Label')
 plt.show()
 
 # Additional clustering methods (e.g., DBSCAN)
-dbscan = DBSCAN(eps=0.5, min_samples=5)
-dbscan_labels = dbscan.fit_predict(X_pca)
-df['dbscan_cluster'] = dbscan_labels
 
-# Calculate silhouette score for DBSCAN
-silhouette_dbscan = silhouette_score(X_pca, dbscan_labels) if len(set(dbscan_labels)) > 1 else None
-print(f'Silhouette Score for DBSCAN: {silhouette_dbscan}')
-
-# Davies-Bouldin Index for DBSCAN
-dbi_dbscan = davies_bouldin_score(X_pca, dbscan_labels) if len(set(dbscan_labels)) > 1 else None
-print(f'Davies-Bouldin Index for DBSCAN: {dbi_dbscan}')
-
-# Plot DBSCAN Clustering Results
-plt.figure(figsize=(10, 7))
-plt.scatter(X_pca[:, 0], X_pca[:, 1], c=dbscan_labels, cmap='coolwarm', s=50, alpha=0.5)
-plt.title('DBSCAN Clustering Results')
-plt.xlabel('PCA Component 1')
-plt.ylabel('PCA Component 2')
-plt.colorbar(label='Cluster Label')
-plt.show()
 
 # Prepare data for the neural network
 y = df['Purchase_Categories'].values
