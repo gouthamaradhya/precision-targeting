@@ -34,42 +34,60 @@ const ProductRecommendation = () => {
 
     return (
         <div>
-            <h2>Product Recommendation</h2>
-            <form onSubmit={handleSubmit}>
-                <div>
-                    <label>
-                        Customer ID:
-                        <input
-                            type="number"
-                            value={customer_id}
-                            onChange={(e) => setCustomer_id(e.target.value)}
-                            required
-                        />
-                    </label>
+            <div className='flex justify-center items-center bg-slate-900 h-24 w-screen'>
+                <div className='font-anton text-zinc-200 text-5xl text-center'>Precision Targeting</div>
+            </div>
+            <div className="bg-slate-300 w-screen h-screen">
+                <div className='flex h-24 w-full items-center justify-center absolute top-24'>
+                    <div className='text-3xl font-anton'>Product Recommendation</div>
                 </div>
-                <div>
-                    <label>
-                        Method:
-                        <select value={method} onChange={(e) => setMethod(e.target.value)}>
-                            <option value="kmeans">K-means</option>
-                            <option value="pso">PSO</option>
-                        </select>
-                    </label>
+                <div className='absolute w-full top-52 flex justify-center'>
+                    <div className='bg-white w-2/3 rounded-md'>
+                        <div>
+                            <form onSubmit={handleSubmit} className=''>
+                                <div className='flex justify-center'>
+                                    <label className='font-anton text-xl'>
+                                        CUSTOMER ID:
+                                        <input
+                                            type="number"
+                                            value={customer_id}
+                                            onChange={(e) => setCustomer_id(e.target.value)}
+                                            required
+                                            className='border-b border-black  ml-7 w-20'
+                                        />
+                                    </label>
+                                </div>
+                                <div className='flex justify-center'>
+                                    <label className='font-anton text-xl' >
+                                        METHOD:
+                                        <select value={method} onChange={(e) => setMethod(e.target.value)} className=' border-black rounded ml-20 mt-14' >
+                                            <option value="kmeans">K-means</option>
+                                            <option value="pso">PSO</option>
+                                        </select>
+                                    </label>
+                                </div>
+                                <div className='flex justify-center'>
+                                    <button type="submit" disabled={!customer_id || !method || loading} className='font-anton bg-blue-700 text-white rounded-md w-56 text-xl mt-12 ml-5 '>
+                                        {loading ? 'Loading...' : 'Get Recommendations'}
+                                    </button>
+                                </div>
+                            </form>
+                            <div>
+                                {error && <p style={{ color: 'red' }}>{error}</p>}
+                                {recommendedProducts.length > 0 ? (
+                                    <ul>
+                                        {recommendedProducts.map((product, index) => (
+                                            <li key={index} className='mt-2 text-md ml-11'>{product}</li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    !loading && <p className='mt-10 text-md text-center'>No recommendations found.</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <button type="submit" disabled={!customer_id || !method || loading}>
-                    {loading ? 'Loading...' : 'Get Recommendations'}
-                </button>
-            </form>
-            {error && <p style={{ color: 'red' }}>{error}</p>}
-            {recommendedProducts.length > 0 ? (
-                <ul>
-                    {recommendedProducts.map((product, index) => (
-                        <li key={index}>{product}</li>
-                    ))}
-                </ul>
-            ) : (
-                !loading && <p>No recommendations found.</p>
-            )}
+            </div>
         </div>
     );
 };
