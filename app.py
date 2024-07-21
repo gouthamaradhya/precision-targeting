@@ -2,9 +2,13 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.metrics import silhouette_score
 from pyswarm import pso
+import tensorflow as tf
 
 app = Flask(__name__)
 CORS(app)
@@ -25,8 +29,7 @@ categorical_features = [
     'Browsing_Frequency', 'Product_Search_Method', 'Search_Result_Exploration',
     'Customer_Reviews_Importance', 'Add_to_Cart_Browsing', 'Cart_Completion_Frequency',
     'Cart_Abandonment_Factors', 'Saveforlater_Frequency', 'Review_Left', 'Review_Reliability',
-    'Review_Helpfulness', 'Recommendation_Helpfulness', 'Shopping_Satisfaction',
-    'Service_Appreciation', 'Improvement_Areas'
+    'Review_Helpfulness', 'Recommendation_Helpfulness', 'Service_Appreciation', 'Improvement_Areas'
 ]
 
 # Encode categorical features and store mappings
@@ -53,7 +56,12 @@ X_scaled = scaler.fit_transform(X)
 
 # Apply K-means clustering
 kmeans = KMeans(n_clusters=5, random_state=0)
-df['kmeans_cluster'] = kmeans.fit_predict(X_scaled)
+kmeans_labels = kmeans.fit_predict(X_scaled)
+df['kmeans_cluster'] = kmeans_labels
+
+# Calculate silhouette score for K-means
+silhouette_kmeans = silhouette_score(X_scaled, kmeans_labels)
+print(f'Silhouette Score for K-means: {silhouette_kmeans}')
 
 # PSO-K-means clustering function
 def pso_kmeans(X, k, max_iter=100):
@@ -75,13 +83,49 @@ def pso_kmeans(X, k, max_iter=100):
     return labels
 
 # Apply PSO-based clustering
-df['pso_cluster'] = pso_kmeans(X_scaled, k=5)
+pso_labels = pso_kmeans(X_scaled, k=5)
+df['pso_cluster'] = pso_labels
+
+# Calculate silhouette score for PSO-based clustering
+silhouette_pso = silhouette_score(X_scaled, pso_labels)
+print(f'Silhouette Score for PSO-based Clustering: {silhouette_pso}')
+
+# Create and fit the neural network model
+model = tf.keras.Sequential([
+    tf.keras.layers.Dense(64, activation='relu', input_shape=(X_scaled.shape[1],)),
+    tf.keras.layers.Dense(64, activation='relu'),
+    tf.keras.layers.Dense(64, activation='relu'),
+    tf.keras.layers.Dense(len(category_mappings), activation='softmax')  # Assuming number of categories as output classes
+])
+
+model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+model.fit(X_scaled, df['Purchase_Categories'], epochs=10, batch_size=32, validation_split=0.2)
+
+# Define mapping from categories to products
+category_to_products = {
+    'Electronics': ['Smartphone', 'Laptop', 'Headphones', 'Smartwatch', 'Camera'],
+    'Clothing': ['T-shirt', 'Jeans', 'Jacket', 'Sneakers', 'Hat'],
+    'Books': ['Fiction Novel', 'Non-Fiction', 'Biographies', 'Self-Help', 'Science Fiction'],
+    'Home & Kitchen': ['Blender', 'Microwave', 'Coffee Maker', 'Cookware Set', 'Vacuum Cleaner'],
+    'Toys': ['Action Figure', 'Board Game', 'Doll', 'Puzzle', 'Building Blocks'],
+    'Clothing and Fashion': ['Dress', 'Jacket', 'Shirt', 'Jeans', 'Shoes'],
+    'Beauty and Personal Care': ['Face Cream', 'Shampoo', 'Lipstick', 'Moisturizer', 'Sunscreen'],
+    'Beauty and Personal Care;Clothing and Fashion': ['Face Cream', 'Shirt', 'Shampoo', 'Dress', 'Lipstick'],
+    'Clothing and Fashion;Home and Kitchen': ['Dress', 'Cookware Set', 'Shirt', 'Blender', 'Jacket'],
+    'Beauty and Personal Care;Home and Kitchen': ['Face Cream', 'Blender', 'Shampoo', 'Cookware Set', 'Moisturizer'],
+    'Others': ['Generic Item 1', 'Generic Item 2', 'Generic Item 3']  # Placeholder for the 'Others' category
+}
 
 # Function to recommend products based on customer ID and clustering method
 def recommend_products_for_customer(customer_id, method):
     if method not in ['kmeans', 'pso']:
         raise ValueError('Invalid method provided.')
 
+    # Check if customer_id exists
+    if customer_id not in df['customer_id'].values:
+        raise ValueError('Customer ID not found.')
+
+    # Filter the data based on the method
     if method == 'kmeans':
         customer_cluster = df[df['customer_id'] == customer_id]['kmeans_cluster'].values[0]
         cluster_data = df[df['kmeans_cluster'] == customer_cluster]
@@ -89,17 +133,46 @@ def recommend_products_for_customer(customer_id, method):
         customer_cluster = df[df['customer_id'] == customer_id]['pso_cluster'].values[0]
         cluster_data = df[df['pso_cluster'] == customer_cluster]
 
+    print(f'Cluster Data for Customer ID {customer_id} using {method}:')
+    print(cluster_data.head())
+
     # Check if 'Purchase_Categories' is valid
     if 'Purchase_Categories' not in cluster_data.columns:
         raise ValueError('Purchase_Categories column is missing.')
 
-    # Get top 5 product categories based on frequency
+    # Remove "Others" category from the cluster data
+    others_data = cluster_data[cluster_data['Purchase_Categories'] == inverse_category_mappings.get('Others', -1)]
+    cluster_data = cluster_data[cluster_data['Purchase_Categories'] != inverse_category_mappings.get('Others', -1)]
+
+    # Print data without "Others" category
+    print('Cluster Data without "Others" Category:')
+    print(cluster_data.head())
+
+    # Get top 5 product categories based on frequency excluding "Others"
     top_categories_indices = cluster_data['Purchase_Categories'].value_counts().index[:5].tolist()
 
     # Decode category indices back to category names
     top_categories_names = [category_mappings.get(idx, str(idx)) for idx in top_categories_indices]
+    print(f'Top Categories: {top_categories_names}')
 
-    return top_categories_names
+    # Get top 10 products from each category
+    recommendations = []
+    for category in top_categories_names:
+        products = category_to_products.get(category, [])
+        recommendations.extend(products[:10])  # Limit to top 10 products per category
+
+    # Add products from "Others" category as a separate case
+    others_products = category_to_products.get('Others', [])
+    recommendations.extend(others_products[:10])
+
+    # Ensure unique recommendations
+    recommendations = list(set(recommendations))
+
+    # Limit to top 10 overall recommendations
+    recommendations = recommendations[:10]
+
+    print(f'Final Recommendations: {recommendations}')
+    return recommendations
 
 # API endpoint to recommend products for a specific customer
 @app.route('/recommend-products', methods=['POST'])
